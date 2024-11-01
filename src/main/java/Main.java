@@ -1,27 +1,31 @@
 import java.util.*;
+import java.util.concurrent.*;
 
 public class Main {
 
-    public static void main(String[] args) throws InterruptedException {
+    public static void main(String[] args) throws InterruptedException, ExecutionException {
 
         String[] texts = new String[25];
         for (int i = 0; i < texts.length; i++) {
             texts[i] = generateText("aab", 30_000);
         }
-        List<Thread> threads = new ArrayList<>();
+        ExecutorService executorService = Executors.newFixedThreadPool(4);
+        List<Future<Integer>> futureList = new ArrayList<>();
+
         long startThread = System.currentTimeMillis(); // start time
         for (String text : texts) {
-            Thread thread = addThread(text);
-            thread.start();
-            threads.add(thread);
+            futureList.add(executorService.submit(addCallable(text)));
         }
-        for (Thread thread : threads) {
-            thread.join(); // зависаем, ждём когда поток объект которого лежит в thread завершится
+        int maxThread = 0;
+        for (Future<Integer> future : futureList) {
+            maxThread = Math.max(maxThread, future.get());
         }
-
+        System.out.println("Максимальное значение при многопоточности - " + maxThread);
+        executorService.close();
         long endThread = System.currentTimeMillis(); // end time
 
         long startTs = System.currentTimeMillis(); // start time
+        int max = 0;
         for (String text : texts) {
 
             int maxSize = 0;
@@ -43,10 +47,10 @@ public class Main {
                 }
             }
             System.out.println(text.substring(0, 100) + " -> " + maxSize);
-
+            max = Math.max(max, maxSize);
         }
         long endTs = System.currentTimeMillis(); // end time
-
+        System.out.println("Максимальное значение при одном потоке - " + max);
         System.out.println("Time: " + (endTs - startTs) + "ms");
         System.out.println("Time multipotok: " + (endThread - startThread) + "ms");
 
@@ -61,8 +65,8 @@ public class Main {
         return text.toString();
     }
 
-    public static Thread addThread(String text) {
-        return new Thread(() -> {
+    public static Callable<Integer> addCallable(String text) {
+        return () -> {
             int maxSize = 0;
             for (int i = 0; i < text.length(); i++) {
                 for (int j = 0; j < text.length(); j++) {
@@ -81,7 +85,8 @@ public class Main {
                     }
                 }
             }
-            System.out.println(text.substring(0, 100) + " -> " + maxSize + " - thread ");
-        });
+            System.out.println(text.substring(0, 100) + " -> " + maxSize);
+            return maxSize;
+        };
     }
 }
